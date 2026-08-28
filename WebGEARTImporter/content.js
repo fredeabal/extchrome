@@ -1,5 +1,6 @@
-console.log("🚀 Extensión Comfica Importer (WebGEART / WebGespol) inyectada correctamente.");
+console.log("🚀 Extensión Comfica Importer (WebGEART / WebGespol / WebGesvirt) inyectada correctamente.");
 
+// 1. Funciones auxiliares de normalización y validación
 function normalizarTexto(txt) {
     return (txt || "")
         .toLowerCase()
@@ -7,18 +8,6 @@ function normalizarTexto(txt) {
         .replace(/[\u0300-\u036f]/g, "")
         .replace(/[^a-z0-9]/g, "")
         .trim();
-}
-
-function obtenerMapaCabeceras(filaCabecera) {
-    const ths = filaCabecera.querySelectorAll("th");
-    const mapa = {};
-    ths.forEach((th, idx) => {
-        const texto = normalizarTexto(th.innerText);
-        if (texto) {
-            mapa[texto] = idx;
-        }
-    });
-    return mapa;
 }
 
 function esTelefonoValido(str) {
@@ -32,8 +21,19 @@ function esTelefonoValido(str) {
 function limpiarTelefono(str) {
     if (!str) return "";
     if (!esTelefonoValido(str)) return "";
-    const digitos = str.replace(/[^\d]/g, '').replace(/^34/, '');
-    return digitos;
+    return str.replace(/[^\d]/g, '').replace(/^34/, '');
+}
+
+function obtenerMapaCabeceras(filaCabecera) {
+    const ths = filaCabecera.querySelectorAll("th");
+    const mapa = {};
+    ths.forEach((th, idx) => {
+        const texto = normalizarTexto(th.innerText);
+        if (texto) {
+            mapa[texto] = idx;
+        }
+    });
+    return mapa;
 }
 
 function buscarIndiceColumna(mapa, posiblesNombres) {
@@ -57,8 +57,65 @@ function buscarIndiceColumna(mapa, posiblesNombres) {
     return -1;
 }
 
+function detectarPortal() {
+    const url = window.location.href.toLowerCase();
+    const titulo = document.title.toLowerCase();
+
+    if (url.includes("gespol") || titulo.includes("gespol")) {
+        return { origen: "WebGespolT", operadora: "JAZZTEL", esGespol: true, esGesvirt: false, esGeart: false };
+    }
+    if (url.includes("gesvirt") || titulo.includes("gesvirt")) {
+        return { origen: "WebGesvirt", operadora: "MOVISTAR", esGespol: false, esGesvirt: true, esGeart: false };
+    }
+    if (url.includes("geart") || titulo.includes("geart")) {
+        return { origen: "WebGEART", operadora: "R-CABLE", esGespol: false, esGesvirt: false, esGeart: true };
+    }
+    return { origen: "Comfica", operadora: "", esGespol: false, esGesvirt: false, esGeart: false };
+}
+
+function inyectarEstilos() {
+    if (!document.getElementById("comfica-importer-style")) {
+        const style = document.createElement("style");
+        style.id = "comfica-importer-style";
+        style.textContent = `
+            .btn-import {
+                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                color: white;
+                border: none;
+                padding: 6px 12px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-weight: 600;
+                font-size: 13px;
+                box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
+                transition: all 0.2s ease;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 6px;
+                white-space: nowrap;
+            }
+            .btn-import:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);
+                background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+            }
+            .btn-import:active {
+                transform: translateY(0);
+            }
+            .btn-import-detalle {
+                padding: 8px 16px;
+                font-size: 14px;
+                margin-left: 15px;
+                vertical-align: middle;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
+// 2. Inyección en la pantalla de Detalle (Detalle.aspx)
 function inyectarBotonEnDetalle() {
-    // Detecta si estamos en una página de Detalle (Detalle.aspx, Detalle, etc.)
     const getVal = (...ids) => {
         for (const id of ids) {
             const el = document.getElementById(id) || document.querySelector(`input[name="${id}"], textarea[name="${id}"]`);
@@ -71,54 +128,14 @@ function inyectarBotonEnDetalle() {
     const cliente = getVal("txtNomCli", "txtCliente", "txtNombreCliente", "lblNomCli");
 
     if ((ot || cliente) && !document.getElementById("btnImportarDetalle")) {
-        const urlActual = window.location.href.toLowerCase();
-        const tituloActual = document.title.toLowerCase();
-        
-        const esWebGespol = urlActual.includes("gespol") || tituloActual.includes("gespol");
-        const esWebGesvirt = urlActual.includes("gesvirt") || tituloActual.includes("gesvirt");
-        const esWebGEART = urlActual.includes("geart") || tituloActual.includes("geart");
+        inyectarEstilos();
 
-        // 1. Estilos
-        if (!document.getElementById("comfica-importer-style")) {
-            const style = document.createElement('style');
-            style.id = "comfica-importer-style";
-            style.textContent = `
-                .btn-import {
-                    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-                    color: white;
-                    border: none;
-                    padding: 8px 16px;
-                    border-radius: 6px;
-                    cursor: pointer;
-                    font-weight: 600;
-                    font-size: 14px;
-                    box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
-                    transition: all 0.2s ease;
-                    display: inline-flex;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 8px;
-                }
-                .btn-import:hover {
-                    transform: translateY(-1px);
-                    box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);
-                    background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
-                }
-                .btn-import:active {
-                    transform: translateY(0);
-                }
-            `;
-            document.head.appendChild(style);
-        }
-
-        // 2. Crear botón
+        const portal = detectarPortal();
         const btn = document.createElement("button");
         btn.id = "btnImportarDetalle";
         btn.type = "button";
-        btn.className = "btn-import";
+        btn.className = "btn-import btn-import-detalle";
         btn.innerHTML = "⚡ Importar Orden a OtGest";
-        btn.style.marginLeft = "15px";
-        btn.style.verticalAlign = "middle";
 
         btn.addEventListener("click", (e) => {
             e.preventDefault();
@@ -134,24 +151,13 @@ function inyectarBotonEnDetalle() {
             const tipoVal = getVal("txtNomOT", "txtTipoOT", "txtTipoOrden", "txtTipoTrabajo", "txtTipo");
             const citaVal = getVal("txtFecCit", "txtFechaCita", "txtCita");
             const refVal = getVal("txtRef", "txtReferencia", "txtNumRef");
-            
+
             const tel1Limpio = limpiarTelefono(telRaw);
             const tel2Limpio = limpiarTelefono(tel2Raw);
 
-            let operadora = "JAZZTEL";
-            let origen = "WebGespolT";
-
-            if (esWebGesvirt) {
-                operadora = "MOVISTAR";
-                origen = "WebGesvirt";
-            } else if (esWebGEART) {
-                operadora = "R-CABLE";
-                origen = "WebGEART";
-            }
-
             const datosFila = {
-                origen: origen,
-                operadora: operadora,
+                origen: portal.origen,
+                operadora: portal.operadora,
                 ot: otVal,
                 tipo_webgeart: tipoVal,
                 cliente: clienteVal,
@@ -171,12 +177,12 @@ function inyectarBotonEnDetalle() {
             });
         });
 
-        // Insertar junto al encabezado de Datos Trabajo o en el encabezado principal
+        // Insertar junto al encabezado de Datos Trabajo o en el contenedor principal
         const encabezado = Array.from(document.querySelectorAll("h4, h5")).find(el => {
             const t = el.innerText.toLowerCase();
             return t.includes("datos") || t.includes("trabajo") || t.includes("orden");
         });
-        
+
         if (encabezado) {
             encabezado.appendChild(btn);
         } else {
@@ -187,6 +193,32 @@ function inyectarBotonEnDetalle() {
     }
 }
 
+// 3. Escanear números de teléfono en celdas de una fila (validación estricta)
+function escanearTelefonosFila(celdas, otExcluir, cpExcluir) {
+    const encontrados = [];
+    const patron = /(?:(?:\+|00)34[\s.-]*)?([6789]\d{2}[\s.-]*\d{3}[\s.-]*\d{3}|\b[6789]\d{8}\b)/g;
+
+    celdas.forEach((celda, idx) => {
+        if (idx === 0) return; // Ignorar columna del botón inyectado
+        const texto = celda.innerText.trim();
+        if (!texto) return;
+        // Ignorar textos descriptivos
+        if (texto.toLowerCase().includes("solicitado") || texto.toLowerCase().includes("finalizado")) return;
+
+        let match;
+        while ((match = patron.exec(texto)) !== null) {
+            const digitos = match[0].replace(/[^\d]/g, '').replace(/^34/, '');
+            if (digitos.length === 9 && digitos !== otExcluir && digitos !== cpExcluir) {
+                if (!encontrados.includes(digitos)) {
+                    encontrados.push(digitos);
+                }
+            }
+        }
+    });
+    return encontrados;
+}
+
+// 4. Inyección en la tabla principal de órdenes (Menu.aspx / lista)
 function intentarInyectarBotones() {
     // 1. Si estamos en una página de Detalle, SOLO inyectamos el botón superior y NO tocamos las tablas
     const esPaginaDetalle = window.location.href.toLowerCase().includes("detalle") || 
@@ -208,11 +240,12 @@ function intentarInyectarBotones() {
         // Comprobamos que la tabla sea la de órdenes y no de baremos/materiales
         const filaCabecera = filas[0];
         const mapaCabeceras = obtenerMapaCabeceras(filaCabecera);
-        
-        // Debe tener al menos columna de OT o Cliente
+
+        // Determinamos índices de columnas
         const idxOT = buscarIndiceColumna(mapaCabeceras, ["codigoot", "numot", "numeroot", "ot"]);
         const idxCliente = buscarIndiceColumna(mapaCabeceras, ["nombrecliente", "cliente", "razonsocial", "titular"]);
-        
+
+        // Debe tener al menos columna de OT o Cliente
         if (idxOT === -1 && idxCliente === -1) {
             return; // No es la tabla de órdenes de trabajo
         }
@@ -220,55 +253,9 @@ function intentarInyectarBotones() {
         tabla.dataset.importadorInyectado = "true";
         console.log("✅ Tabla principal de órdenes encontrada. Inyectando botones...");
 
-        // 1. Inyectamos estilos premium para el botón
-        if (!document.getElementById("comfica-importer-style")) {
-            const style = document.createElement('style');
-            style.id = "comfica-importer-style";
-            style.textContent = `
-                .btn-import {
-                    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-                    color: white;
-                    border: none;
-                    padding: 6px 12px;
-                    border-radius: 6px;
-                    cursor: pointer;
-                    font-weight: 600;
-                    font-size: 13px;
-                    box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
-                    transition: all 0.2s ease;
-                    display: inline-flex;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 6px;
-                    white-space: nowrap;
-                }
-                .btn-import:hover {
-                    transform: translateY(-1px);
-                    box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);
-                    background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
-                }
-                .btn-import:active {
-                    transform: translateY(0);
-                }
-            `;
-            document.head.appendChild(style);
-        }
+        inyectarEstilos();
 
-        // 2. Detectar portal (WebGEART, WebGespolT, WebGesvirt)
-        const urlActual = window.location.href.toLowerCase();
-        const tituloActual = document.title.toLowerCase();
-        
-        const esWebGespol = urlActual.includes("gespol") || tituloActual.includes("gespol");
-        const esWebGesvirt = urlActual.includes("gesvirt") || tituloActual.includes("gesvirt");
-        const esWebGEART = urlActual.includes("geart") || tituloActual.includes("geart");
-
-        // Extraemos el mapa de cabeceras de la primera fila antes de modificar el DOM
-        const filaCabecera = filas[0];
-        const mapaCabeceras = obtenerMapaCabeceras(filaCabecera);
-
-        // Determinamos índices originales (0-based antes de inyectar botón)
-        const idxOT = buscarIndiceColumna(mapaCabeceras, ["codigoot", "numot", "numeroot", "ot"]);
-        const idxCliente = buscarIndiceColumna(mapaCabeceras, ["nombrecliente", "cliente", "razonsocial", "titular"]);
+        const portal = detectarPortal();
         const idxDireccion = buscarIndiceColumna(mapaCabeceras, ["direccion", "domicilio", "calle"]);
         const idxCP = buscarIndiceColumna(mapaCabeceras, ["cp", "codigopostal"]);
         const idxPoblacion = buscarIndiceColumna(mapaCabeceras, ["poblacion", "localidad", "municipio", "ciudad"]);
@@ -276,37 +263,11 @@ function intentarInyectarBotones() {
         const idxRef = buscarIndiceColumna(mapaCabeceras, ["referencia"]);
         const idxTel1 = buscarIndiceColumna(mapaCabeceras, ["telefono1", "telefono", "tfno1", "tfno", "tlf1", "tlf", "contacto", "movil"]);
         const idxTel2 = buscarIndiceColumna(mapaCabeceras, ["telefono2", "tfno2", "tlf2", "movil2"]);
-        const idxDesc = buscarIndiceColumna(mapaCabeceras, ["descripcion", "anotacionesinternas", "observaciones", "notas"]);
         const idxCita = buscarIndiceColumna(mapaCabeceras, ["fechacita", "cita", "fechaconcertada"]);
 
-        // Función para escanear números de teléfono válidos (9 dígitos empezando por 6, 7, 8 o 9) en las celdas
-        const escanearTelefonosFila = (celdas, otExcluir, cpExcluir) => {
-            const encontrados = [];
-            const patron = /(?:(?:\+|00)34[\s.-]*)?([6789]\d{2}[\s.-]*\d{3}[\s.-]*\d{3}|\b[6789]\d{8}\b)/g;
-            
-            celdas.forEach((celda, idx) => {
-                const texto = celda.innerText.trim();
-                if (!texto) return;
-                // Si el texto es una palabra común como "solicitado", "pendiente", etc., ignorar
-                if (texto.toLowerCase().includes("solicitado") || texto.toLowerCase().includes("finalizado")) return;
-                
-                let match;
-                while ((match = patron.exec(texto)) !== null) {
-                    const digitos = match[0].replace(/[^\d]/g, '').replace(/^34/, '');
-                    if (digitos.length === 9 && digitos !== otExcluir && digitos !== cpExcluir) {
-                        if (!encontrados.includes(digitos)) {
-                            encontrados.push(digitos);
-                        }
-                    }
-                }
-            });
-            return encontrados;
-        };
-
-        // 3. Iteramos por todas las filas para inyectar botones
         filas.forEach((fila, index) => {
             const celdasCabecera = fila.querySelectorAll("th");
-            
+
             if (celdasCabecera.length > 0 || index === 0) {
                 // Añadimos columna a la cabecera
                 const th = document.createElement("th");
@@ -317,17 +278,16 @@ function intentarInyectarBotones() {
                 // Añadimos columna de datos con el botón
                 const td = document.createElement("td");
                 td.style.textAlign = "center";
-                
+
                 const btn = document.createElement("button");
                 btn.type = "button";
                 btn.className = "btn-import";
                 btn.innerHTML = "Importar";
-                
-                // Evento al hacer click en el botón
+
                 btn.addEventListener("click", (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    
+
                     const celdas = Array.from(fila.querySelectorAll("td"));
                     const getValor = (idxOriginal, fallbackIdx) => {
                         const i = (idxOriginal !== -1) ? idxOriginal : fallbackIdx;
@@ -337,7 +297,7 @@ function intentarInyectarBotones() {
 
                     let datosFila = {};
 
-                    if (esWebGespol) {
+                    if (portal.esGespol) {
                         const ot = getValor(idxOT, 4);
                         const cp = getValor(idxCP, 13);
                         const telefonosDetectados = escanearTelefonosFila(celdas, ot, cp);
@@ -359,7 +319,7 @@ function intentarInyectarBotones() {
                             descripcion: "",
                             fecha_cita: getValor(idxCita, 7)
                         };
-                    } else if (esWebGesvirt) {
+                    } else if (portal.esGesvirt) {
                         const ot = getValor(idxOT, 4);
                         const cp = getValor(idxCP, 13);
                         const telefonosDetectados = escanearTelefonosFila(celdas, ot, cp);
@@ -381,7 +341,7 @@ function intentarInyectarBotones() {
                             descripcion: "",
                             fecha_cita: getValor(idxCita, 7)
                         };
-                    } else if (esWebGEART) {
+                    } else if (portal.esGeart) {
                         const ot = getValor(idxOT, 3);
                         const cp = getValor(idxCP, 19);
                         const telefonosDetectados = escanearTelefonosFila(celdas, ot, cp);
@@ -426,11 +386,10 @@ function intentarInyectarBotones() {
                             fecha_cita: getValor(idxCita, -1)
                         };
                     }
-                    
+
                     console.log("🚀 Guardando datos en memoria y abriendo OtGest:", datosFila);
-                    
+
                     chrome.storage.local.set({ 'datosImportacion': datosFila }, function() {
-                        // Abrimos OtGest en una nueva pestaña
                         window.open('https://otgest.com/orders/create', '_blank');
                     });
                 });
@@ -439,11 +398,11 @@ function intentarInyectarBotones() {
                 fila.insertBefore(td, fila.firstChild);
             }
         });
-        console.log("✅ Botones de importación añadidos a la tabla.");
+        console.log("✅ Botones de importación añadidos a la tabla principal.");
     }
 }
 
-// Ejecutar la comprobación cada 1 segundo (espera a que el usuario busque o cargue las órdenes)
+// Ejecutar la comprobación cada 1 segundo
 const intervalo = setInterval(() => {
     intentarInyectarBotones();
 }, 1000);
