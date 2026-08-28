@@ -1,4 +1,4 @@
-console.log("🚀 Extensión Importer (WebGEART / WebGespol / WebGesvirt / POLAR) inyectada correctamente.");
+console.log("🚀 Extensión ImporterOtgest inyectada correctamente.");
 
 // 1. Funciones auxiliares de normalización y validación
 function normalizarTexto(txt) {
