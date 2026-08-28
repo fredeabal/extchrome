@@ -58,11 +58,19 @@ function buscarIndiceColumna(mapa, posiblesNombres) {
 }
 
 function inyectarBotonEnDetalle() {
-    // Detecta si estamos en una página de Detalle (ej: Detalle.aspx)
-    const inputNumOT = document.getElementById("txtNumOT") || document.getElementById("txtIdOT");
-    const inputNomCli = document.getElementById("txtNomCli");
+    // Detecta si estamos en una página de Detalle (Detalle.aspx, Detalle, etc.)
+    const getVal = (...ids) => {
+        for (const id of ids) {
+            const el = document.getElementById(id) || document.querySelector(`input[name="${id}"], textarea[name="${id}"]`);
+            if (el && el.value && el.value.trim()) return el.value.trim();
+        }
+        return "";
+    };
 
-    if (inputNumOT && inputNomCli && !document.getElementById("btnImportarDetalle")) {
+    const ot = getVal("txtNumOT", "txtIdOT", "txtOT", "txtCodigoOT", "lblNumOT");
+    const cliente = getVal("txtNomCli", "txtCliente", "txtNombreCliente", "lblNomCli");
+
+    if ((ot || cliente) && !document.getElementById("btnImportarDetalle")) {
         const urlActual = window.location.href.toLowerCase();
         const tituloActual = document.title.toLowerCase();
         
@@ -116,15 +124,19 @@ function inyectarBotonEnDetalle() {
             e.preventDefault();
             e.stopPropagation();
 
-            const ot = document.getElementById("txtNumOT")?.value.trim() || document.getElementById("txtIdOT")?.value.trim() || "";
-            const cliente = document.getElementById("txtNomCli")?.value.trim() || "";
-            const direccion = document.getElementById("txtDirCli")?.value.trim() || "";
-            const cp = document.getElementById("txtCpCli")?.value.trim() || "";
-            const poblacion = document.getElementById("txtMunCli")?.value.trim() || "";
-            const telRaw = document.getElementById("txtTelCli")?.value.trim() || "";
-            const tipo = document.getElementById("txtNomOT")?.value.trim() || "";
-            const cita = document.getElementById("txtFecCit")?.value.trim() || "";
-            const telLimpio = limpiarTelefono(telRaw);
+            const otVal = getVal("txtNumOT", "txtIdOT", "txtOT", "txtCodigoOT");
+            const clienteVal = getVal("txtNomCli", "txtCliente", "txtNombreCliente");
+            const direccionVal = getVal("txtDirCli", "txtDireccion", "txtDomicilio");
+            const cpVal = getVal("txtCpCli", "txtCP", "txtCodPostal");
+            const poblacionVal = getVal("txtMunCli", "txtPoblacion", "txtMunicipio", "txtLocalidad");
+            const telRaw = getVal("txtTelCli", "txtTelefono", "txtTel", "txtTel1", "txtContacto", "txtTelefono1");
+            const tel2Raw = getVal("txtTel2", "txtTelefono2", "txtTelCli2");
+            const tipoVal = getVal("txtNomOT", "txtTipoOT", "txtTipoOrden", "txtTipoTrabajo", "txtTipo");
+            const citaVal = getVal("txtFecCit", "txtFechaCita", "txtCita");
+            const refVal = getVal("txtRef", "txtReferencia", "txtNumRef");
+            
+            const tel1Limpio = limpiarTelefono(telRaw);
+            const tel2Limpio = limpiarTelefono(tel2Raw);
 
             let operadora = "JAZZTEL";
             let origen = "WebGespolT";
@@ -140,53 +152,73 @@ function inyectarBotonEnDetalle() {
             const datosFila = {
                 origen: origen,
                 operadora: operadora,
-                ot: ot,
-                tipo_webgeart: tipo,
-                cliente: cliente,
-                direccion: direccion,
-                cp: cp,
-                poblacion: poblacion,
-                referencia: "",
-                telefono1: telLimpio,
-                telefono2: "",
+                ot: otVal,
+                tipo_webgeart: tipoVal,
+                cliente: clienteVal,
+                direccion: direccionVal,
+                cp: cpVal,
+                poblacion: poblacionVal,
+                referencia: refVal,
+                telefono1: tel1Limpio,
+                telefono2: tel2Limpio,
                 descripcion: "",
-                fecha_cita: cita
+                fecha_cita: citaVal
             };
 
-            console.log("🚀 Importando desde Detalle:", datosFila);
+            console.log("🚀 Importando desde pantalla de Detalle:", datosFila);
             chrome.storage.local.set({ 'datosImportacion': datosFila }, function() {
                 window.open('https://otgest.com/orders/create', '_blank');
             });
         });
 
-        // Insertar junto al encabezado de Datos Trabajo o en el contenedor principal
-        const encabezado = Array.from(document.querySelectorAll("h4, h5")).find(el => el.innerText.includes("Datos"));
+        // Insertar junto al encabezado de Datos Trabajo o en el encabezado principal
+        const encabezado = Array.from(document.querySelectorAll("h4, h5")).find(el => {
+            const t = el.innerText.toLowerCase();
+            return t.includes("datos") || t.includes("trabajo") || t.includes("orden");
+        });
+        
         if (encabezado) {
             encabezado.appendChild(btn);
         } else {
             const container = document.querySelector(".container") || document.body;
             container.insertBefore(btn, container.firstChild);
         }
-        console.log("✅ Botón de importación añadido a la página de Detalle.");
+        console.log("✅ Botón de importación añadido a la pantalla de Detalle.");
     }
 }
 
 function intentarInyectarBotones() {
-    // 1. Probar si estamos en página de Detalle
-    inyectarBotonEnDetalle();
+    // 1. Si estamos en una página de Detalle, SOLO inyectamos el botón superior y NO tocamos las tablas
+    const esPaginaDetalle = window.location.href.toLowerCase().includes("detalle") || 
+                            Boolean(document.getElementById("txtNumOT") || document.getElementById("txtIdOT") || document.getElementById("txtNomCli"));
 
-    // 2. Busca la tabla de órdenes en páginas de lista/menú
+    if (esPaginaDetalle) {
+        inyectarBotonEnDetalle();
+        return; // Salir para no inyectar en tablas secundarias como Baremos o Materiales
+    }
+
+    // 2. Busca la tabla principal de órdenes en páginas de lista/menú
     const tabla = document.getElementById("dgTra") || 
-                  document.querySelector("table[id*='dgTra']") || 
-                  document.querySelector("table[id*='dg']") || 
-                  document.querySelector("table.table");
+                  document.querySelector("table[id*='dgTra']");
 
     if (tabla && !tabla.dataset.importadorInyectado) {
         const filas = Array.from(tabla.querySelectorAll("tr"));
-        if (filas.length === 0) return; // Aún no hay filas cargadas
+        if (filas.length === 0) return;
+
+        // Comprobamos que la tabla sea la de órdenes y no de baremos/materiales
+        const filaCabecera = filas[0];
+        const mapaCabeceras = obtenerMapaCabeceras(filaCabecera);
+        
+        // Debe tener al menos columna de OT o Cliente
+        const idxOT = buscarIndiceColumna(mapaCabeceras, ["codigoot", "numot", "numeroot", "ot"]);
+        const idxCliente = buscarIndiceColumna(mapaCabeceras, ["nombrecliente", "cliente", "razonsocial", "titular"]);
+        
+        if (idxOT === -1 && idxCliente === -1) {
+            return; // No es la tabla de órdenes de trabajo
+        }
 
         tabla.dataset.importadorInyectado = "true";
-        console.log("✅ Tabla de órdenes encontrada. Inyectando botones...");
+        console.log("✅ Tabla principal de órdenes encontrada. Inyectando botones...");
 
         // 1. Inyectamos estilos premium para el botón
         if (!document.getElementById("comfica-importer-style")) {
