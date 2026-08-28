@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Importador Comfica (WebGEART / WebGespol)",
-  "version": "1.1",
+  "name": "Importador Comfica & Polar a OtGest",
+  "version": "1.2",
 
-  "description": "Importa órdenes desde WebGEART, WebGespolT y WebGesvirt a OtGest",
+  "description": "Importa órdenes desde WebGEART, WebGespolT, WebGesvirt y POLAR a OtGest",
 
   "permissions": [
     "activeTab",
@@ -12,13 +12,15 @@
 
   "host_permissions": [
     "https://aplicaciones.comfica.com/*",
+    "https://polar-tecnicos.orange.es/*",
     "https://otgest.com/*"
   ],
 
   "content_scripts": [
     {
       "matches": [
-        "https://aplicaciones.comfica.com/*"
+        "https://aplicaciones.comfica.com/*",
+        "https://polar-tecnicos.orange.es/*"
       ],
       "js": [
         "content.js"

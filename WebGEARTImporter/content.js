@@ -1,4 +1,4 @@
-console.log("🚀 Extensión Comfica Importer (WebGEART / WebGespol / WebGesvirt) inyectada correctamente.");
+console.log("🚀 Extensión Importer (WebGEART / WebGespol / WebGesvirt / POLAR) inyectada correctamente.");
 
 // 1. Funciones auxiliares de normalización y validación
 function normalizarTexto(txt) {
@@ -61,16 +61,19 @@ function detectarPortal() {
     const url = window.location.href.toLowerCase();
     const titulo = document.title.toLowerCase();
 
+    if (url.includes("polar-tecnicos.orange.es") || url.includes("polar") || titulo.includes("field service management")) {
+        return { origen: "POLAR", operadora: "ORANGE", esPolar: true, esGespol: false, esGesvirt: false, esGeart: false };
+    }
     if (url.includes("gespol") || titulo.includes("gespol")) {
-        return { origen: "WebGespolT", operadora: "JAZZTEL", esGespol: true, esGesvirt: false, esGeart: false };
+        return { origen: "WebGespolT", operadora: "JAZZTEL", esPolar: false, esGespol: true, esGesvirt: false, esGeart: false };
     }
     if (url.includes("gesvirt") || titulo.includes("gesvirt")) {
-        return { origen: "WebGesvirt", operadora: "MOVISTAR", esGespol: false, esGesvirt: true, esGeart: false };
+        return { origen: "WebGesvirt", operadora: "MOVISTAR", esPolar: false, esGespol: false, esGesvirt: true, esGeart: false };
     }
     if (url.includes("geart") || titulo.includes("geart")) {
-        return { origen: "WebGEART", operadora: "R-CABLE", esGespol: false, esGesvirt: false, esGeart: true };
+        return { origen: "WebGEART", operadora: "R-CABLE", esPolar: false, esGespol: false, esGesvirt: false, esGeart: true };
     }
-    return { origen: "Comfica", operadora: "", esGespol: false, esGesvirt: false, esGeart: false };
+    return { origen: "Comfica", operadora: "", esPolar: false, esGespol: false, esGesvirt: false, esGeart: false };
 }
 
 function inyectarEstilos() {
@@ -80,7 +83,7 @@ function inyectarEstilos() {
         style.textContent = `
             .btn-import {
                 background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-                color: white;
+                color: white !important;
                 border: none;
                 padding: 6px 12px;
                 border-radius: 6px;
@@ -94,11 +97,13 @@ function inyectarEstilos() {
                 justify-content: center;
                 gap: 6px;
                 white-space: nowrap;
+                text-decoration: none;
             }
             .btn-import:hover {
                 transform: translateY(-1px);
                 box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);
                 background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+                color: white !important;
             }
             .btn-import:active {
                 transform: translateY(0);
@@ -108,6 +113,12 @@ function inyectarEstilos() {
                 font-size: 14px;
                 margin-left: 15px;
                 vertical-align: middle;
+            }
+            .btn-import-polar {
+                margin-top: 8px;
+                width: 100%;
+                display: block;
+                text-align: center;
             }
         `;
         document.head.appendChild(style);
@@ -204,7 +215,128 @@ function inyectarBotonEnDetalle() {
     }
 }
 
-// 3. Escanear números de teléfono en celdas de una fila (validación estricta)
+// 3. Inyección en portal POLAR (polar-tecnicos.orange.es)
+function inyectarEnPolar() {
+    const portal = detectarPortal();
+    if (!portal.esPolar) return;
+
+    inyectarEstilos();
+
+    // A) Inyección en listado de órdenes (Dashboard)
+    const itemsOt = document.querySelectorAll(".item-ot-listado, .list-group-item");
+    itemsOt.forEach((item) => {
+        if (item.dataset.importadorInyectado) return;
+
+        const elCodigo = item.querySelector(".codigo");
+        if (!elCodigo || !elCodigo.innerText.trim()) return; // No es un elemento de orden con código
+
+        item.dataset.importadorInyectado = "true";
+
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn-import btn-import-polar";
+        btn.innerHTML = "Importar a OtGest";
+
+        btn.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const otVal = item.querySelector(".codigo")?.innerText.trim() || "";
+            const nombre = item.querySelector(".nombre")?.innerText.trim() || "";
+            const apellidos = item.querySelector(".apellidos")?.innerText.trim() || "";
+            const clienteVal = (nombre + " " + apellidos).trim();
+            const direccionVal = item.querySelector(".direccion")?.innerText.trim() || "";
+            const cpVal = item.querySelector(".cp")?.innerText.trim() || "";
+            const telRaw = item.querySelector(".telefono")?.innerText.trim() || "";
+            const tipoVal = item.querySelector(".tipo-ot")?.innerText.trim() || "";
+            const marca = item.querySelector(".marca")?.innerText.trim().toUpperCase() || "";
+            const citaVal = item.querySelector(".hora-asignacion")?.innerText.trim() || item.querySelector(".hora")?.innerText.trim() || "";
+
+            let operadora = "ORANGE";
+            if (marca.includes("JAZZTEL")) operadora = "JAZZTEL";
+            else if (marca.includes("SIMYO")) operadora = "SIMYO";
+            else if (marca.includes("MASMOVIL") || marca.includes("MÁSMÓVIL")) operadora = "MASMOVIL";
+            else if (marca) operadora = marca;
+
+            const tel1Limpio = limpiarTelefono(telRaw);
+
+            const datosFila = {
+                origen: "POLAR",
+                operadora: operadora,
+                ot: otVal,
+                tipo_webgeart: tipoVal,
+                cliente: clienteVal,
+                direccion: direccionVal,
+                cp: cpVal,
+                poblacion: "",
+                referencia: "",
+                telefono1: tel1Limpio,
+                telefono2: "",
+                descripcion: "",
+                fecha_cita: citaVal
+            };
+
+            console.log("🚀 Importando desde POLAR:", datosFila);
+            chrome.storage.local.set({ 'datosImportacion': datosFila }, function() {
+                window.open('https://otgest.com/orders/create', '_blank');
+            });
+        });
+
+        item.appendChild(btn);
+    });
+
+    // B) Inyección en Modal de Cita de POLAR (#ModalDetallesCita)
+    const modalCita = document.getElementById("ModalDetallesCita");
+    if (modalCita && !modalCita.querySelector("#btnImportarModalPolar")) {
+        const modalHeader = modalCita.querySelector(".modal-header");
+        if (modalHeader) {
+            const btnModal = document.createElement("button");
+            btnModal.id = "btnImportarModalPolar";
+            btnModal.type = "button";
+            btnModal.className = "btn-import";
+            btnModal.innerHTML = "Importar a OtGest";
+            btnModal.style.marginLeft = "15px";
+
+            btnModal.addEventListener("click", (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const otVal = document.getElementById("detalleCita_ordenTrabajo")?.value.trim() || "";
+                const clienteVal = document.getElementById("detalle_ClienteDocumento")?.value.trim() || "";
+                const cpVal = document.getElementById("detalle_codigoPostal")?.value.trim() || "";
+                const dia = document.getElementById("nuevaCitaModalDiaHueco")?.value.trim() || "";
+                const hora = document.getElementById("nuevaCitaModalHoraHueco")?.value.trim() || "";
+                const citaVal = (dia + " " + hora).trim();
+                const tipoVal = document.getElementById("detalleCita_subzona")?.value.trim() || "";
+
+                const datosFila = {
+                    origen: "POLAR",
+                    operadora: "ORANGE",
+                    ot: otVal,
+                    tipo_webgeart: tipoVal,
+                    cliente: clienteVal,
+                    direccion: "",
+                    cp: cpVal,
+                    poblacion: "",
+                    referencia: "",
+                    telefono1: "",
+                    telefono2: "",
+                    descripcion: "",
+                    fecha_cita: citaVal
+                };
+
+                console.log("🚀 Importando desde Modal POLAR:", datosFila);
+                chrome.storage.local.set({ 'datosImportacion': datosFila }, function() {
+                    window.open('https://otgest.com/orders/create', '_blank');
+                });
+            });
+
+            modalHeader.appendChild(btnModal);
+        }
+    }
+}
+
+// 4. Escanear números de teléfono en celdas de una fila (validación estricta)
 function escanearTelefonosFila(celdas, otExcluir, cpExcluir) {
     const encontrados = [];
     const patron = /(?:(?:\+|00)34[\s.-]*)?([6789]\d{2}[\s.-]*\d{3}[\s.-]*\d{3}|\b[6789]\d{8}\b)/g;
@@ -229,9 +361,17 @@ function escanearTelefonosFila(celdas, otExcluir, cpExcluir) {
     return encontrados;
 }
 
-// 4. Inyección en la tabla principal de órdenes (Menu.aspx / lista)
+// 5. Inyección en la tabla principal de órdenes (Menu.aspx / lista de Comfica)
 function intentarInyectarBotones() {
-    // 1. Si estamos en una página de Detalle, SOLO inyectamos el botón superior y NO tocamos las tablas
+    const portal = detectarPortal();
+
+    // 1. Si estamos en POLAR
+    if (portal.esPolar) {
+        inyectarEnPolar();
+        return;
+    }
+
+    // 2. Si estamos en una página de Detalle, SOLO inyectamos el botón superior y NO tocamos las tablas
     const esPaginaDetalle = window.location.href.toLowerCase().includes("detalle") || 
                             Boolean(document.getElementById("txtNumTra") || document.getElementById("txtNumOT") || 
                                     document.getElementById("txtIdOT") || document.getElementById("txtCliTra") || 
@@ -242,7 +382,7 @@ function intentarInyectarBotones() {
         return; // Salir para no inyectar en tablas secundarias como Baremos o Materiales
     }
 
-    // 2. Busca la tabla principal de órdenes en páginas de lista/menú
+    // 3. Busca la tabla principal de órdenes en páginas de lista/menú de Comfica
     const tabla = document.getElementById("dgTra") || 
                   document.querySelector("table[id*='dgTra']");
 
@@ -268,7 +408,6 @@ function intentarInyectarBotones() {
 
         inyectarEstilos();
 
-        const portal = detectarPortal();
         const idxDireccion = buscarIndiceColumna(mapaCabeceras, ["direccion", "domicilio", "calle", "dirtra"]);
         const idxCP = buscarIndiceColumna(mapaCabeceras, ["cp", "codigopostal", "codpostra"]);
         const idxPoblacion = buscarIndiceColumna(mapaCabeceras, ["poblacion", "localidad", "municipio", "ciudad", "pobtra"]);
