@@ -223,9 +223,10 @@ function inyectarEnPolar() {
     inyectarEstilos();
 
     // A) Inyección en listado de órdenes (Dashboard)
-    const itemsOt = document.querySelectorAll(".item-ot-listado, .list-group-item");
+    // Seleccionamos solo el elemento principal dentro de la tarjeta para no duplicar botones
+    const itemsOt = document.querySelectorAll(".item-ot-listado a.list-group-item, #ordenes-list a.list-group-item");
     itemsOt.forEach((item) => {
-        if (item.dataset.importadorInyectado) return;
+        if (item.dataset.importadorInyectado || item.querySelector(".btn-import-polar")) return;
 
         const elCodigo = item.querySelector(".codigo");
         if (!elCodigo || !elCodigo.innerText.trim()) return; // No es un elemento de orden con código
@@ -242,9 +243,24 @@ function inyectarEnPolar() {
             e.stopPropagation();
 
             const otVal = item.querySelector(".codigo")?.innerText.trim() || "";
-            const nombre = item.querySelector(".nombre")?.innerText.trim() || "";
-            const apellidos = item.querySelector(".apellidos")?.innerText.trim() || "";
-            const clienteVal = (nombre + " " + apellidos).trim();
+            const nombre = (item.querySelector(".nombre")?.innerText || "").trim();
+            const apellidos = (item.querySelector(".apellidos")?.innerText || "").trim();
+            
+            let clienteVal = "";
+            if (nombre && apellidos) {
+                if (nombre.toLowerCase() === apellidos.toLowerCase()) {
+                    clienteVal = nombre;
+                } else if (nombre.toLowerCase().includes(apellidos.toLowerCase())) {
+                    clienteVal = nombre;
+                } else if (apellidos.toLowerCase().includes(nombre.toLowerCase())) {
+                    clienteVal = apellidos;
+                } else {
+                    clienteVal = `${nombre} ${apellidos}`.trim();
+                }
+            } else {
+                clienteVal = nombre || apellidos || "";
+            }
+
             const direccionVal = item.querySelector(".direccion")?.innerText.trim() || "";
             const cpVal = item.querySelector(".cp")?.innerText.trim() || "";
             const telRaw = item.querySelector(".telefono")?.innerText.trim() || "";
