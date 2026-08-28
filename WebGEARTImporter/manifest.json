@@ -1,0 +1,37 @@
+{
+  "manifest_version": 3,
+  "name": "Importador Comfica (WebGEART / WebGespol)",
+  "version": "1.1",
+
+  "description": "Importa órdenes desde WebGEART, WebGespolT y WebGesvirt a OtGest",
+
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+
+  "host_permissions": [
+    "https://aplicaciones.comfica.com/*",
+    "https://otgest.com/*"
+  ],
+
+  "content_scripts": [
+    {
+      "matches": [
+        "https://aplicaciones.comfica.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "https://otgest.com/orders/create*"
+      ],
+      "js": [
+        "otgest_autofill.js"
+      ]
+    }
+  ]
+}

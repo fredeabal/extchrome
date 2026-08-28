@@ -1,0 +1,11 @@
+# Archivos de claves privadas y seguridad
+*.pem
+*.key
+
+# Archivos compilados o empaquetados
+*.crx
+*.zip
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
