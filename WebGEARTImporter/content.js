@@ -114,7 +114,7 @@ function inyectarEstilos() {
     }
 }
 
-// 2. Inyección en la pantalla de Detalle (Detalle.aspx)
+// 2. Inyección en la pantalla de Detalle (Detalle.aspx de WebGEART, WebGespolT y WebGesvirTv1)
 function inyectarBotonEnDetalle() {
     const getVal = (...ids) => {
         for (const id of ids) {
@@ -124,8 +124,9 @@ function inyectarBotonEnDetalle() {
         return "";
     };
 
-    const ot = getVal("txtNumOT", "txtIdOT", "txtOT", "txtCodigoOT", "lblNumOT");
-    const cliente = getVal("txtNomCli", "txtCliente", "txtNombreCliente", "lblNomCli");
+    // Buscamos OT o Cliente soportando campos de WebGEART (*Tra) y WebGespol/WebGesvirt (*OT, *Cli)
+    const ot = getVal("txtNumTra", "txtNumOT", "txtIdOT", "txtOT", "txtCodigoOT", "lblNumTra", "lblNumOT");
+    const cliente = getVal("txtCliTra", "txtNomCli", "txtCliente", "txtNombreCliente", "lblCliTra", "lblNomCli");
 
     if ((ot || cliente) && !document.getElementById("btnImportarDetalle")) {
         inyectarEstilos();
@@ -135,22 +136,32 @@ function inyectarBotonEnDetalle() {
         btn.id = "btnImportarDetalle";
         btn.type = "button";
         btn.className = "btn-import btn-import-detalle";
-        btn.innerHTML = "⚡ Importar Orden a OtGest";
+        btn.innerHTML = "Importar a OtGest";
 
         btn.addEventListener("click", (e) => {
             e.preventDefault();
             e.stopPropagation();
 
-            const otVal = getVal("txtNumOT", "txtIdOT", "txtOT", "txtCodigoOT");
-            const clienteVal = getVal("txtNomCli", "txtCliente", "txtNombreCliente");
-            const direccionVal = getVal("txtDirCli", "txtDireccion", "txtDomicilio");
-            const cpVal = getVal("txtCpCli", "txtCP", "txtCodPostal");
-            const poblacionVal = getVal("txtMunCli", "txtPoblacion", "txtMunicipio", "txtLocalidad");
-            const telRaw = getVal("txtTelCli", "txtTelefono", "txtTel", "txtTel1", "txtContacto", "txtTelefono1");
-            const tel2Raw = getVal("txtTel2", "txtTelefono2", "txtTelCli2");
-            const tipoVal = getVal("txtNomOT", "txtTipoOT", "txtTipoOrden", "txtTipoTrabajo", "txtTipo");
-            const citaVal = getVal("txtFecCit", "txtFechaCita", "txtCita");
-            const refVal = getVal("txtRef", "txtReferencia", "txtNumRef");
+            const otVal = getVal("txtNumTra", "txtNumOT", "txtIdOT", "txtOT", "txtCodigoOT");
+            const clienteVal = getVal("txtCliTra", "txtNomCli", "txtCliente", "txtNombreCliente");
+            const direccionVal = getVal("txtDirTra", "txtDirCli", "txtDireccion", "txtDomicilio");
+            const cpVal = getVal("txtCodPosTra", "txtCpCli", "txtCP", "txtCodPostal");
+            const poblacionVal = getVal("txtPobTra", "txtMunCli", "txtPoblacion", "txtMunicipio", "txtLocalidad");
+            
+            // Teléfonos (móvil y fijo en GEART, o campo general en Gespol/Gesvirt)
+            const telRaw = getVal("txtTelMovCliTra", "txtTelCli", "txtTelefono", "txtTel", "txtTel1", "txtContacto", "txtTelefono1");
+            const tel2Raw = getVal("txtTelFijCliTra", "txtTel2", "txtTelefono2", "txtTelCli2");
+            
+            const tipoVal = getVal("txtTipTra", "txtNomOT", "txtTipoOT", "txtTipoOrden", "txtTipoTrabajo", "txtTipo");
+            const citaVal = getVal("txtFecTra", "txtFecCit", "txtFechaCita", "txtCita");
+            
+            // Referencia o Id Hueco
+            let refVal = getVal("txtRef", "txtReferencia", "txtNumRef");
+            const comentarios = getVal("txtComInsTra", "txtAnotacionesInternas", "txtObservaciones");
+            if (!refVal && comentarios) {
+                const matchHueco = comentarios.match(/Id\s*Hueco:\s*(\d+)/i);
+                if (matchHueco) refVal = matchHueco[1];
+            }
 
             const tel1Limpio = limpiarTelefono(telRaw);
             const tel2Limpio = limpiarTelefono(tel2Raw);
@@ -222,7 +233,9 @@ function escanearTelefonosFila(celdas, otExcluir, cpExcluir) {
 function intentarInyectarBotones() {
     // 1. Si estamos en una página de Detalle, SOLO inyectamos el botón superior y NO tocamos las tablas
     const esPaginaDetalle = window.location.href.toLowerCase().includes("detalle") || 
-                            Boolean(document.getElementById("txtNumOT") || document.getElementById("txtIdOT") || document.getElementById("txtNomCli"));
+                            Boolean(document.getElementById("txtNumTra") || document.getElementById("txtNumOT") || 
+                                    document.getElementById("txtIdOT") || document.getElementById("txtCliTra") || 
+                                    document.getElementById("txtNomCli"));
 
     if (esPaginaDetalle) {
         inyectarBotonEnDetalle();
@@ -242,8 +255,8 @@ function intentarInyectarBotones() {
         const mapaCabeceras = obtenerMapaCabeceras(filaCabecera);
 
         // Determinamos índices de columnas
-        const idxOT = buscarIndiceColumna(mapaCabeceras, ["codigoot", "numot", "numeroot", "ot"]);
-        const idxCliente = buscarIndiceColumna(mapaCabeceras, ["nombrecliente", "cliente", "razonsocial", "titular"]);
+        const idxOT = buscarIndiceColumna(mapaCabeceras, ["codigoot", "numot", "numeroot", "ot", "numtra"]);
+        const idxCliente = buscarIndiceColumna(mapaCabeceras, ["nombrecliente", "cliente", "razonsocial", "titular", "clitra"]);
 
         // Debe tener al menos columna de OT o Cliente
         if (idxOT === -1 && idxCliente === -1) {
@@ -256,14 +269,14 @@ function intentarInyectarBotones() {
         inyectarEstilos();
 
         const portal = detectarPortal();
-        const idxDireccion = buscarIndiceColumna(mapaCabeceras, ["direccion", "domicilio", "calle"]);
-        const idxCP = buscarIndiceColumna(mapaCabeceras, ["cp", "codigopostal"]);
-        const idxPoblacion = buscarIndiceColumna(mapaCabeceras, ["poblacion", "localidad", "municipio", "ciudad"]);
-        const idxTipo = buscarIndiceColumna(mapaCabeceras, ["tipoorden", "tipoordendetalle", "tipotrabajo"]);
+        const idxDireccion = buscarIndiceColumna(mapaCabeceras, ["direccion", "domicilio", "calle", "dirtra"]);
+        const idxCP = buscarIndiceColumna(mapaCabeceras, ["cp", "codigopostal", "codpostra"]);
+        const idxPoblacion = buscarIndiceColumna(mapaCabeceras, ["poblacion", "localidad", "municipio", "ciudad", "pobtra"]);
+        const idxTipo = buscarIndiceColumna(mapaCabeceras, ["tipoorden", "tipoordendetalle", "tipotrabajo", "tiptra"]);
         const idxRef = buscarIndiceColumna(mapaCabeceras, ["referencia"]);
-        const idxTel1 = buscarIndiceColumna(mapaCabeceras, ["telefono1", "telefono", "tfno1", "tfno", "tlf1", "tlf", "contacto", "movil"]);
-        const idxTel2 = buscarIndiceColumna(mapaCabeceras, ["telefono2", "tfno2", "tlf2", "movil2"]);
-        const idxCita = buscarIndiceColumna(mapaCabeceras, ["fechacita", "cita", "fechaconcertada"]);
+        const idxTel1 = buscarIndiceColumna(mapaCabeceras, ["telefono1", "telefono", "tfno1", "tfno", "tlf1", "tlf", "contacto", "movil", "telmovclitra"]);
+        const idxTel2 = buscarIndiceColumna(mapaCabeceras, ["telefono2", "tfno2", "tlf2", "movil2", "telfijclitra"]);
+        const idxCita = buscarIndiceColumna(mapaCabeceras, ["fechacita", "cita", "fechaconcertada", "fectra"]);
 
         filas.forEach((fila, index) => {
             const celdasCabecera = fila.querySelectorAll("th");
