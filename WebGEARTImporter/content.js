@@ -100,10 +100,32 @@ function intentarInyectarBotones() {
         const idxPoblacion = buscarIndiceColumna(mapaCabeceras, ["poblacion", "localidad", "municipio", "ciudad"]);
         const idxTipo = buscarIndiceColumna(mapaCabeceras, ["tipoorden", "tipoordendetalle", "tipotrabajo", "tipo"]);
         const idxRef = buscarIndiceColumna(mapaCabeceras, ["referencia", "ref"]);
-        const idxTel1 = buscarIndiceColumna(mapaCabeceras, ["telefono1", "telefono", "movil", "telef", "tel"]);
-        const idxTel2 = buscarIndiceColumna(mapaCabeceras, ["telefono2", "tel2"]);
+        const idxTel1 = buscarIndiceColumna(mapaCabeceras, ["telefono1", "telefono", "tfno1", "tfno", "tlf1", "tlf", "contacto", "movil", "movil1", "telef", "tel"]);
+        const idxTel2 = buscarIndiceColumna(mapaCabeceras, ["telefono2", "tfno2", "tlf2", "movil2", "tel2"]);
         const idxDesc = buscarIndiceColumna(mapaCabeceras, ["descripcion", "anotacionesinternas", "observaciones", "notas"]);
         const idxCita = buscarIndiceColumna(mapaCabeceras, ["fechacita", "cita", "fechaconcertada"]);
+
+        // Función para escanear números de teléfono (9 dígitos empezando por 6, 7, 8 o 9) en las celdas
+        const escanearTelefonosFila = (celdas, otExcluir, cpExcluir) => {
+            const encontrados = [];
+            const patron = /(?:(?:\+|00)34[\s.-]*)?([6789]\d{2}[\s.-]*\d{3}[\s.-]*\d{3}|\b[6789]\d{8}\b)/g;
+            
+            celdas.forEach((celda, idx) => {
+                const texto = celda.innerText.trim();
+                if (!texto) return;
+                
+                let match;
+                while ((match = patron.exec(texto)) !== null) {
+                    const digitos = match[0].replace(/[^\d]/g, '').replace(/^34/, '');
+                    if (digitos.length === 9 && digitos !== otExcluir && digitos !== cpExcluir) {
+                        if (!encontrados.includes(digitos)) {
+                            encontrados.push(digitos);
+                        }
+                    }
+                }
+            });
+            return encontrados;
+        };
 
         // 3. Iteramos por todas las filas para inyectar botones
         filas.forEach((fila, index) => {
@@ -130,9 +152,7 @@ function intentarInyectarBotones() {
                     e.preventDefault();
                     e.stopPropagation();
                     
-                    const celdas = fila.querySelectorAll("td");
-                    // celdas[0] es nuestro botón inyectado.
-                    // Por lo tanto, el índice original i se encuentra en celdas[i + 1].
+                    const celdas = Array.from(fila.querySelectorAll("td"));
                     const getValor = (idxOriginal, fallbackIdx) => {
                         const i = (idxOriginal !== -1) ? idxOriginal : fallbackIdx;
                         if (i === -1 || i === undefined || i === null) return "";
@@ -142,78 +162,85 @@ function intentarInyectarBotones() {
                     let datosFila = {};
 
                     if (esWebGespol) {
-                        // Mapeo específico Gespol (Jazztel / Orange)
+                        const ot = getValor(idxOT, 4);
+                        const cp = getValor(idxCP, 13);
+                        const telefonosDetectados = escanearTelefonosFila(celdas, ot, cp);
                         datosFila = {
                             origen: "WebGespolT",
                             operadora: "JAZZTEL",
-                            ot: getValor(idxOT, 4),                     // CodigoOT
-                            tipo_webgeart: getValor(idxTipo, 8),        // TipoOrden
-                            cliente: getValor(idxCliente, 11),          // NombreCliente
-                            direccion: getValor(idxDireccion, 12),      // Direccion
-                            cp: getValor(idxCP, 13),                   // CP
+                            ot: ot,
+                            tipo_webgeart: getValor(idxTipo, 8),
+                            cliente: getValor(idxCliente, 11),
+                            direccion: getValor(idxDireccion, 12),
+                            cp: cp,
                             poblacion: getValor(idxPoblacion, -1),
                             referencia: "",
-                            telefono1: getValor(idxTel1, -1),
-                            telefono2: getValor(idxTel2, -1),
+                            telefono1: getValor(idxTel1, -1) || telefonosDetectados[0] || "",
+                            telefono2: getValor(idxTel2, -1) || telefonosDetectados[1] || "",
                             descripcion: "",
                             fecha_cita: getValor(idxCita, 7)
                         };
                     } else if (esWebGesvirt) {
-                        // Mapeo GESVIRT (Telefónica / Movistar)
+                        const ot = getValor(idxOT, 4);
+                        const cp = getValor(idxCP, 13);
+                        const telefonosDetectados = escanearTelefonosFila(celdas, ot, cp);
                         datosFila = {
                             origen: "WebGesvirt",
                             operadora: "MOVISTAR",
-                            ot: getValor(idxOT, 4),
+                            ot: ot,
                             tipo_webgeart: getValor(idxTipo, 8),
                             cliente: getValor(idxCliente, 11),
                             direccion: getValor(idxDireccion, 12),
-                            cp: getValor(idxCP, 13),
+                            cp: cp,
                             poblacion: getValor(idxPoblacion, -1),
                             referencia: "",
-                            telefono1: getValor(idxTel1, -1),
-                            telefono2: getValor(idxTel2, -1),
+                            telefono1: getValor(idxTel1, -1) || telefonosDetectados[0] || "",
+                            telefono2: getValor(idxTel2, -1) || telefonosDetectados[1] || "",
                             descripcion: "",
                             fecha_cita: getValor(idxCita, 7)
                         };
                     } else if (esWebGEART) {
-                        // Mapeo específico WebGEART (R-Cable)
+                        const ot = getValor(idxOT, 3);
+                        const cp = getValor(idxCP, 19);
+                        const telefonosDetectados = escanearTelefonosFila(celdas, ot, cp);
                         datosFila = {
                             origen: "WebGEART",
                             operadora: "R-CABLE",
-                            ot: getValor(idxOT, 3),                     // Original 3
-                            tipo_webgeart: getValor(idxTipo, 4),        // Original 4
-                            referencia: getValor(idxRef, 10),           // Original 10
-                            poblacion: getValor(idxPoblacion, 17),      // Original 17
-                            direccion: getValor(idxDireccion, 18),      // Original 18
-                            cp: getValor(idxCP, 19),                   // Original 19
-                            cliente: getValor(idxCliente, 28),          // Original 28
-                            telefono1: getValor(idxTel1, 29),           // Original 29
-                            telefono2: getValor(idxTel2, 30),           // Original 30
-                            descripcion: getValor(idxDesc, -1),
+                            ot: ot,
+                            tipo_webgeart: getValor(idxTipo, 4),
+                            referencia: getValor(idxRef, 10),
+                            poblacion: getValor(idxPoblacion, 17),
+                            direccion: getValor(idxDireccion, 18),
+                            cp: cp,
+                            cliente: getValor(idxCliente, 28),
+                            telefono1: getValor(idxTel1, 29) || telefonosDetectados[0] || "",
+                            telefono2: getValor(idxTel2, 30) || telefonosDetectados[1] || "",
+                            descripcion: "",
                             fecha_cita: getValor(idxCita, -1)
                         };
                     } else {
-                        // Detección 100% dinámica por nombres de columnas para cualquier otra tabla de Comfica
+                        const ot = getValor(idxOT, -1);
+                        const cp = getValor(idxCP, -1);
+                        const telefonosDetectados = escanearTelefonosFila(celdas, ot, cp);
                         datosFila = {
                             origen: "Comfica",
                             operadora: "",
-                            ot: getValor(idxOT, -1),
+                            ot: ot,
                             tipo_webgeart: getValor(idxTipo, -1),
                             referencia: getValor(idxRef, -1),
                             poblacion: getValor(idxPoblacion, -1),
                             direccion: getValor(idxDireccion, -1),
-                            cp: getValor(idxCP, -1),
+                            cp: cp,
                             cliente: getValor(idxCliente, -1),
-                            telefono1: getValor(idxTel1, -1),
-                            telefono2: getValor(idxTel2, -1),
-                            descripcion: getValor(idxDesc, -1),
+                            telefono1: getValor(idxTel1, -1) || telefonosDetectados[0] || "",
+                            telefono2: getValor(idxTel2, -1) || telefonosDetectados[1] || "",
+                            descripcion: "",
                             fecha_cita: getValor(idxCita, -1)
                         };
                     }
                     
                     console.log("🚀 Guardando datos en memoria y abriendo OtGest:", datosFila);
                     
-                    // Guardamos los datos en la memoria de la extensión
                     chrome.storage.local.set({ 'datosImportacion': datosFila }, function() {
                         // Abrimos OtGest en una nueva pestaña
                         window.open('https://otgest.com/orders/create', '_blank');

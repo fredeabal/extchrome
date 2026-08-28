@@ -70,14 +70,30 @@ chrome.storage.local.get(['datosImportacion'], function(result) {
         }
 
         // Teléfono de Contacto
-        const inputContacto = document.getElementById('ot_contacto');
+        const inputContacto = document.getElementById('ot_contacto') || 
+                              document.getElementById('ot_telefono') || 
+                              document.getElementById('ot_telefonos') || 
+                              document.querySelector('input[name="ot_contacto"]') || 
+                              document.querySelector('input[name="contacto"]') || 
+                              document.querySelector('input[name="telefono"]') ||
+                              document.querySelector('input[id*="contacto"]') ||
+                              document.querySelector('input[id*="telefono"]');
         if (inputContacto) {
             let telefonos = [];
-            if (datos.telefono1) telefonos.push(datos.telefono1);
-            if (datos.telefono2) telefonos.push(datos.telefono2);
+            if (datos.telefono1) telefonos.push(datos.telefono1.trim());
+            if (datos.telefono2 && !telefonos.includes(datos.telefono2.trim())) telefonos.push(datos.telefono2.trim());
+            // Si viene una lista de teléfonos
+            if (Array.isArray(datos.telefonos)) {
+                datos.telefonos.forEach(t => {
+                    const limpio = (t || "").trim();
+                    if (limpio && !telefonos.includes(limpio)) telefonos.push(limpio);
+                });
+            }
             if (telefonos.length > 0) {
                 inputContacto.value = telefonos.join(' / ');
                 inputContacto.dispatchEvent(new Event('input', { bubbles: true }));
+                inputContacto.dispatchEvent(new Event('change', { bubbles: true }));
+                inputContacto.dispatchEvent(new Event('blur', { bubbles: true }));
             }
         }
 
